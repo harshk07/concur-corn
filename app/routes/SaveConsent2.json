@@ -1,0 +1,185 @@
+[
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "dp_id",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "df_id",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "cp_id",
+				"type": "string"
+			}
+		],
+		"name": "ConsentStored",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_dp_id",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_df_id",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_cp_id",
+				"type": "string"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_dataElements",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[][]",
+				"name": "_purpose_ids",
+				"type": "string[][]"
+			},
+			{
+				"internalType": "bool[][]",
+				"name": "_consent_statuses",
+				"type": "bool[][]"
+			},
+			{
+				"internalType": "uint256[][]",
+				"name": "_purpose_retention",
+				"type": "uint256[][]"
+			},
+			{
+				"internalType": "uint256[][]",
+				"name": "_purpose_expiry",
+				"type": "uint256[][]"
+			}
+		],
+		"name": "storeConsent",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_user",
+				"type": "address"
+			}
+		],
+		"name": "getConsent",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "dp_id",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "df_id",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "cp_id",
+						"type": "string"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "dataElement",
+								"type": "string"
+							},
+							{
+								"components": [
+									{
+										"internalType": "string",
+										"name": "purpose_id",
+										"type": "string"
+									},
+									{
+										"internalType": "bool",
+										"name": "consent_status",
+										"type": "bool"
+									},
+									{
+										"internalType": "uint256",
+										"name": "purpose_retention",
+										"type": "uint256"
+									},
+									{
+										"internalType": "uint256",
+										"name": "purpose_expiry",
+										"type": "uint256"
+									}
+								],
+								"internalType": "struct DataConsent.ConsentEntry[]",
+								"name": "consents",
+								"type": "tuple[]"
+							}
+						],
+						"internalType": "struct DataConsent.ConsentScope[]",
+						"name": "consent_scope",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct DataConsent.Consent",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "userConsents",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "dp_id",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "df_id",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "cp_id",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]
