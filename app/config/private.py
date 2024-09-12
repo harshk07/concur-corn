@@ -11,3 +11,4 @@ db = client["consent_foundation"]
 
 # Access the specific collection
 collection_points = db["collection_points"]
+consent_collection = db["consent_collection"]
