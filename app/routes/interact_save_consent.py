@@ -5,14 +5,17 @@ import json
 from web3.exceptions import ContractLogicError, TransactionNotFound
 from app.config.private import consent_collection
 import datetime
+from app.config.private import *
+import requests
+from bson import ObjectId
 
 contractInteractRoute = APIRouter()
 
 # Connect to Ethereum network (Sepolia, Goerli, or local)
-w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:7545'))
+w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
 
 # Load the contract ABI and address
-contract_address = Web3.to_checksum_address('0x73e05866b28e20225ef1e29355bb135229c2f974')
+contract_address = Web3.to_checksum_address('0x386a79c234eb6c1e4e35741346430ede3b46e50d')
 with open('app/routes/SaveConsent2.json', 'r') as abi_file:
     contract_abi = json.load(abi_file)
 
@@ -118,12 +121,32 @@ async def store_consent(input: ConsentInput):
 #         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @contractInteractRoute.post("/buildConsentTransaction")
-async def build_consent_transaction():
+async def build_consent_transaction(consent_id: str):
     try:
-        # Find consent entries where `is_txn_build` is False
-        pending_consent = consent_collection.find_one({"is_txn_build": False})
+        # Convert consent_id to ObjectId
+        try:
+            consent_object_id = ObjectId(consent_id)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid consent ID format")
+
+        # Find the consent entry by MongoDB _id and check if the transaction is not built
+        pending_consent = consent_collection.find_one({"_id": consent_object_id, "is_txn_build": False})
         if not pending_consent:
-            raise HTTPException(status_code=404, detail="No pending consent transactions found")
+            raise HTTPException(status_code=404, detail="No pending consent transaction found for the given ID")
+
+        dp_id = pending_consent["dp_id"]
+
+        # Call the /get-user-wallet-address API to get the wallet address
+        wallet_address_url = "http://127.0.0.1:7000/get-user-wallet-address"
+        wallet_response = requests.get(wallet_address_url, params={"dp_id": dp_id})
+        
+        # Check if the request was successful
+        if wallet_response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Error fetching wallet address: {wallet_response.json()}")
+
+        wallet_address = wallet_response.json().get("wallet_address")
+        if not wallet_address:
+            raise HTTPException(status_code=500, detail="No wallet address returned for the given dp_id")
 
         # Extract data from the pending consent
         data_elements = [scope["dataElement"] for scope in pending_consent["consent_scopes"]]
@@ -132,7 +155,7 @@ async def build_consent_transaction():
         retention_periods = [[entry["purpose_retention"] for entry in scope["consents"]] for scope in pending_consent["consent_scopes"]]
         expiry_periods = [[entry["purpose_expiry"] for entry in scope["consents"]] for scope in pending_consent["consent_scopes"]]
 
-        # Build the transaction (without signing it)
+        # Build the transaction using the fetched wallet address (without signing it)
         txn = contract.functions.storeConsent(
             pending_consent["dp_id"],
             pending_consent["df_id"],
@@ -143,17 +166,19 @@ async def build_consent_transaction():
             retention_periods,
             expiry_periods
         ).build_transaction({
-            'from': '0x0000000000000000000000000000000000000000',  # Dummy address for building
-            'nonce': w3.eth.get_transaction_count('0x0000000000000000000000000000000000000000'),
+            'from': wallet_address,  # Use the retrieved wallet address
+            'nonce': w3.eth.get_transaction_count(wallet_address),
             'gas': 4000000,
-            'gasPrice': w3.to_wei('50', 'gwei')
+            'gasPrice': w3.to_wei('0', 'gwei')
         })
 
         # Store the built transaction in the `build_transaction_collection`
         build_txn_data = {
             "consent_id": str(pending_consent["_id"]),
+            "dp_id": dp_id,
             "transaction": txn,
-            "created_at": datetime.datetime.utcnow()
+            "created_at": datetime.datetime.utcnow(),
+            "is_signed": False
         }
         build_txn_id = build_transaction_collection.insert_one(build_txn_data).inserted_id
 
@@ -172,6 +197,7 @@ async def build_consent_transaction():
 async def get_consent(user_address: str):
     try:
         # Call the getConsent function from the contract
+        user_address = Web3.to_checksum_address(user_address)
         consent_data = contract.functions.getConsent(user_address).call()
 
         # Process the retrieved data
@@ -199,3 +225,40 @@ async def get_consent(user_address: str):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+class SignedTransactionData(BaseModel):
+    signed_transaction: str
+
+@contractInteractRoute.post("/push-to-blockchain")
+async def push_to_blockchain(signed_txn_data: SignedTransactionData):
+    try:
+        # Decode the signed transaction from the provided hex string
+        signed_txn = signed_txn_data.signed_transaction
+
+        # Send the signed transaction to the blockchain
+        txn_hash = w3.eth.send_raw_transaction(signed_txn)
+
+        # Wait for the transaction receipt
+        txn_receipt = w3.eth.wait_for_transaction_receipt(txn_hash)
+
+        # Store the transaction receipt in the database (transaction_receipts_collection)
+        txn_receipt_data = {
+            "transaction_hash": txn_receipt.transactionHash.hex(),
+            "block_hash": txn_receipt.blockHash.hex(),
+            "block_number": txn_receipt.blockNumber,
+            "gas_used": txn_receipt.gasUsed,
+            "status": txn_receipt.status,  # Status 1 means success
+            "logs": txn_receipt.logs,
+            "created_at": datetime.datetime.utcnow()
+        }
+        txn_receipt_id = transaction_receipts_collection.insert_one(txn_receipt_data).inserted_id
+
+        return {
+            "status": "success",
+            "txn_hash": txn_receipt.transactionHash.hex(),
+            "block_number": txn_receipt.blockNumber,
+            "txn_receipt_id": str(txn_receipt_id)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred while pushing the transaction: {str(e)}")
