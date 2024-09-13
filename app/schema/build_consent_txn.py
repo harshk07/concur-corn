@@ -72,9 +72,48 @@ def build_consent_transaction():
                 "dp_id": dp_id,
                 "transaction": txn,
                 "created_at": datetime.datetime.utcnow(),
-                "is_signed": False
+                "is_signed": False,
+                "is_published_to_blockchain": False
             }
             build_txn_id = build_transaction_collection.insert_one(build_txn_data).inserted_id
+
+            # Fetch the data from `build_transaction_collection`
+            build_txn = build_transaction_collection.find_one({"_id": build_txn_id})
+
+            # Prepare the data to send to /send-build-transaction API
+            send_build_txn_data = {
+                "dp_id": build_txn["dp_id"],
+                "transaction": build_txn["transaction"],
+                "created_at": build_txn["created_at"].isoformat(),  # Convert datetime to ISO format string
+                "is_signed": build_txn["is_signed"]
+            }
+
+            # Call the /send-build-transaction API to post the build transaction data to custody
+            send_build_txn_url = "http://127.0.0.1:7000/send-build-transaction"
+            send_build_txn_response = requests.post(send_build_txn_url, json=send_build_txn_data)
+
+            # Check if the request was successful
+            if send_build_txn_response.status_code != 200:
+                raise HTTPException(status_code=500, detail=f"Error sending build transaction for consent ID {consent_id}: {send_build_txn_response.json()}")
+
+            # Get the response data containing signed_txn_id and signed_transaction
+            response_data = send_build_txn_response.json()
+            signed_txn_id = response_data.get("signed_txn_id")
+            signed_transaction = response_data.get("signed_transaction")
+
+            if signed_txn_id and signed_transaction:
+                # Update the `is_signed`, `signed_txn_id`, and `signed_transaction` fields in `build_transaction_collection`
+                build_transaction_collection.update_one(
+                    {"_id": build_txn_id},
+                    {"$set": {
+                        "is_signed": True,
+                        "signed_txn_id": signed_txn_id,
+                        "signed_transaction": signed_transaction
+                    }}
+                )
+                print(f"Transaction signed for consent ID {consent_id}: Signed TXN ID {signed_txn_id}")
+            else:
+                print(f"Error: Missing signed_txn_id or signed_transaction for consent ID {consent_id}")
 
             # Update the `is_txn_build` flag in the `consent_collection`
             consent_collection.update_one(
@@ -82,13 +121,10 @@ def build_consent_transaction():
                 {"$set": {"is_txn_build": True}}
             )
 
-            print(f"Transaction built for consent ID {consent_id}: Build TXN ID {build_txn_id}")
-
         if count == 0:
             print("No pending consent transactions found")
-            # raise HTTPException(status_code=404, detail="No pending consent transactions found")
 
-        return {"status": "success", "message": "Transactions built for all pending consents"}
+        return {"status": "success", "message": "Transactions built, signed, and sent for all pending consents"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
