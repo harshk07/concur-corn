@@ -38,7 +38,7 @@ class ConsentInput(BaseModel):
     cp_id: str
     consent_scopes: list[ConsentScope]
 
-@contractInteractRoute.post("/storeConsent")
+@contractInteractRoute.post("/store-consent", tags = ["Consent Management"])
 async def store_consent(input: ConsentInput):
     try:
         # Prepare data for MongoDB
@@ -120,7 +120,7 @@ async def store_consent(input: ConsentInput):
 #         # General error handler for any unforeseen issues
 #         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
-@contractInteractRoute.post("/buildConsentTransaction")
+@contractInteractRoute.post("/build-consent-transaction", tags =["Consent Foundation APIs"])
 async def build_consent_transaction(consent_id: str):
     try:
         # Convert consent_id to ObjectId
@@ -193,7 +193,7 @@ async def build_consent_transaction(consent_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
-@contractInteractRoute.get("/getConsent/{user_address}")
+@contractInteractRoute.get("/get-consent/{user_address}", tags = ["Consent Management"])
 async def get_consent(user_address: str):
     try:
         # Call the getConsent function from the contract
@@ -229,7 +229,7 @@ async def get_consent(user_address: str):
 class SignedTransactionData(BaseModel):
     signed_transaction: str
 
-@contractInteractRoute.post("/push-to-blockchain")
+@contractInteractRoute.post("/push-to-blockchain", tags =["Consent Foundation APIs"])
 async def push_to_blockchain(signed_txn_data: SignedTransactionData):
     try:
         # Decode the signed transaction from the provided hex string
