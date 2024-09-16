@@ -15,7 +15,7 @@ contractInteractRoute = APIRouter()
 w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
 
 # Load the contract ABI and address
-contract_address = Web3.to_checksum_address('0x386a79c234eb6c1e4e35741346430ede3b46e50d')
+contract_address = Web3.to_checksum_address('0x51a908044059Da690ac6F50e5Cd4acDE43d00372')
 with open('app/routes/SaveConsent2.json', 'r') as abi_file:
     contract_abi = json.load(abi_file)
 
@@ -24,7 +24,7 @@ contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 # Models to reflect the structure of the smart contract
 class ConsentEntry(BaseModel):
     purpose_id: str
-    consent_status: bool
+    consent_status: bool = False
     purpose_retention: int
     purpose_expiry: int
 
@@ -34,6 +34,9 @@ class ConsentScope(BaseModel):
 
 class ConsentInput(BaseModel):
     dp_id: str
+    dp_email_hash: str = None
+    dp_mobile_hash: str = None
+    org_id: str
     df_id: str
     cp_id: str
     consent_scopes: list[ConsentScope]
@@ -44,6 +47,9 @@ async def store_consent(input: ConsentInput):
         # Prepare data for MongoDB
         consent_data = {
             "dp_id": input.dp_id,
+            "dp_email_hash": input.dp_email_hash,
+            "dp_mobile_hash": input.dp_mobile_hash,
+            "org_id": input.org_id,
             "df_id": input.df_id,
             "cp_id": input.cp_id,
             "consent_scopes": [scope.dict() for scope in input.consent_scopes],

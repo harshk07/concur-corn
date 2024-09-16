@@ -3,25 +3,19 @@ from bson import ObjectId
 from web3 import Web3
 from app.config.private import *
 import json, datetime
-
-# Connect to Ethereum network (Sepolia, Goerli, or local)
-w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
-
-# Load the contract ABI and address
-contract_address = Web3.to_checksum_address('0x386a79c234eb6c1e4e35741346430ede3b46e50d')
-with open('app/routes/SaveConsent2.json', 'r') as abi_file:
-    contract_abi = json.load(abi_file)
-
-contract = w3.eth.contract(address=contract_address, abi=contract_abi)
-
 from bson import ObjectId
 
 def push_signed_transactions_to_blockchain():
     try:
+        # Connect to Ethereum network (Sepolia, Goerli, or local)
+        w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
+
         # Fetch all documents from build_transaction_collection where is_signed = True
-        signed_transactions = build_transaction_collection.find({"is_signed": True, "is_published_in_blockchain": False})
+        signed_transactions = build_transaction_collection.find({"is_signed": True, "is_published_to_blockchain": False})
         
+        count = 0
         for signed_txn_data in signed_transactions:
+            count += 1
             try:
                 # Extract the signed transaction data
                 signed_txn = signed_txn_data["signed_transaction"]
@@ -59,6 +53,9 @@ def push_signed_transactions_to_blockchain():
 
             except Exception as e:
                 print(f"Error occurred while pushing transaction for signed_txn_id {signed_txn_data['_id']}: {str(e)}")
+
+        if count == 0:
+            print("No signed transaction found to push to blockchain")
 
         return {"status": "success", "message": "All signed transactions have been pushed to the blockchain"}
 

@@ -5,18 +5,13 @@ from app.config.private import *
 from web3 import Web3
 import json, requests
 import datetime
-# Connect to Ethereum network (Sepolia, Goerli, or local)
-w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
 
-# Load the contract ABI and address
-contract_address = Web3.to_checksum_address('0x386a79c234eb6c1e4e35741346430ede3b46e50d')
-with open('app/routes/SaveConsent2.json', 'r') as abi_file:
-    contract_abi = json.load(abi_file)
-
-contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 
 def build_consent_transaction():
     try:
+        # Connect to Ethereum network (Sepolia, Goerli, or local)
+        w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
+
         # Fetch all documents in consent_collection where is_txn_build is False
         pending_consents = consent_collection.find({"is_txn_build": False})
 
@@ -27,12 +22,26 @@ def build_consent_transaction():
 
             consent_id = pending_consent["_id"]
             dp_id = pending_consent["dp_id"]
+            dp_email_hash = pending_consent["dp_email_hash"]
+            dp_mobile_hash = pending_consent["dp_mobile_hash"]
 
             print(f"Processing consent: {consent_id}, dp_id: {dp_id}")
 
+            # Fetch collection point data based on org_id and cp_id from pending consent
+            collection_point_data = collection_points.find_one({"org_id": pending_consent["org_id"], "cp_id": pending_consent["cp_id"]})
+            if not collection_point_data:
+                raise HTTPException(status_code=500, detail=f"Collection point data not found for org_id {pending_consent['org_id']} and cp_id {pending_consent['cp_id']}")
+
+            # Load the contract ABI and address
+            contract_address = Web3.to_checksum_address(collection_point_data["contract_address"])
+            with open('app/routes/SaveConsent2.json', 'r') as abi_file:
+                contract_abi = json.load(abi_file)
+
+            contract = w3.eth.contract(address=contract_address, abi=contract_abi)
+
             # Call the /get-user-wallet-address API to get the wallet address
             wallet_address_url = "http://127.0.0.1:7000/get-user-wallet-address"
-            wallet_response = requests.get(wallet_address_url, params={"dp_id": dp_id})
+            wallet_response = requests.get(wallet_address_url, params={"dp_id": dp_id, "dp_email_hash": dp_email_hash or None, "dp_mobile_hash": dp_mobile_hash or None})
 
             # Check if the request was successful
             if wallet_response.status_code != 200:
@@ -128,3 +137,4 @@ def build_consent_transaction():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
