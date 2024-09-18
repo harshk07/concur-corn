@@ -15,7 +15,7 @@ contractInteractRoute = APIRouter()
 w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:22000'))
 
 # Load the contract ABI and address
-contract_address = Web3.to_checksum_address('0x51a908044059Da690ac6F50e5Cd4acDE43d00372')
+contract_address = Web3.to_checksum_address('0xC1C1F0fB406e0b4126e8D21b81C98B2C4C582f79')
 with open('app/routes/SaveConsent2.json', 'r') as abi_file:
     contract_abi = json.load(abi_file)
 
@@ -200,10 +200,18 @@ async def build_consent_transaction(consent_id: str):
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 @contractInteractRoute.get("/get-consent/{user_address}", tags = ["Consent Management"])
-async def get_consent(user_address: str):
+async def get_consent(user_address: str, contract_address: str):
     try:
         # Call the getConsent function from the contract
         user_address = Web3.to_checksum_address(user_address)
+
+        # Load the contract ABI and address
+        contract_address = Web3.to_checksum_address(contract_address)
+        with open('app/routes/SaveConsent2.json', 'r') as abi_file:
+            contract_abi = json.load(abi_file)
+
+        contract = w3.eth.contract(address=contract_address, abi=contract_abi)
+
         consent_data = contract.functions.getConsent(user_address).call()
 
         # Process the retrieved data
