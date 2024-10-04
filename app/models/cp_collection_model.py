@@ -41,6 +41,7 @@ class DataElement(BaseModel):
 class CPData(BaseModel):
     org_id: str
     application_id: str
+    cp_id: str
     cp_name: str
     cp_status: str
     data_elements: List[DataElement]
